@@ -15,6 +15,7 @@ from aiogram.fsm.context import FSMContext
 from states.form import VacancyForm, TrackForm
 from utils.typing import send_typing
 from services.hh_service import run_hh_parser
+from scrapers.habr_scraper import parse_habr_resumes
 from config import TRACK_FILE, RESUME_FILE, EXTERNAL_URL
 
 router = Router()
@@ -200,24 +201,46 @@ async def get_city(message: Message, state: FSMContext, bot: Bot):
 
     async def background_search():
         try:
+            # 1. Запуск основного парсера (HH)
             count, results = await run_hh_parser(
                 vacancy, city, progress_callback=progress_callback
             )
+
+            # 2. Условие: если результатов меньше 47, добираем из Хабра
+            if count < 47:
+                # Можно добавить принт для логов (пользователь не увидит)
+                print(f"Мало данных ({count}), запускаем парсинг Habr...")
+
+                # Запускаем ваш парсер Habr Career
+                # Передаем vacancy как query. max_pages можно настроить
+                habr_results = await parse_habr_resumes(query=vacancy, max_pages=3)
+
+                if habr_results:
+                    # Объединяем списки
+                    results.extend(habr_results)
+                    # Обновляем общее количество для отчета
+                    count = len(results)
+
+            # 3. Сохранение ОБЪЕДИНЕННОГО списка в один JSON
             with open(RESUME_FILE, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=4)
 
             print(f"\n--- ПАРСИНГ ЗАВЕРШЕН: {vacancy} ---")
+
+            # Отправка полных данных на внешний URL
             await send_data_to_url(
                 {"vacancy": vacancy, "city": city, "count": count, "results": results}
             )
 
+            # Сообщение пользователю (просто общее число)
             await bot.edit_message_text(
                 chat_id=progress_msg.chat.id,
                 message_id=progress_msg.message_id,
                 text=f"✅ Поиск «{vacancy}» завершен!\nНайдено резюме: {count}\nДанные отправлены.",
             )
+
         except Exception as e:
-            print(f"Ошибка: {e}")
+            print(f"Ошибка в фоновом поиске: {e}")
             await bot.send_message(message.chat.id, "⚠️ Ошибка во время поиска.")
         finally:
             await state.clear()
