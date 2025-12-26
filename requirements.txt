@@ -1,0 +1,6 @@
+aiogram
+playwright
+aiohttp
+python-dotenv
+dotenv
+aiohttp

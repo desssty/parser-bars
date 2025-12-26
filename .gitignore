@@ -1,0 +1,17 @@
+# --- Данные и конфиденциальность ---
+.env
+time.json
+resume.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# --- Логи и прочее ---
+*.log
+.DS_Store
